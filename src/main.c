@@ -4,7 +4,10 @@
 #include <sodium.h>
 #include <string.h>
 #include "game.h"
+#include "settings_loader.h"
+#ifdef DEBUG
 #include "debug.h"
+#endif
 
 void initGame(game *g, gameSettings settings)
 {
@@ -184,7 +187,22 @@ void main()
     }
 
     game g;
-    gameSettings settings = {.splitDeck = 1, .tenOnSeven = 0, .playerAutoOrder = 0, .hinting = 0, .aiDifficulty = 3};
+    gameSettings settings = {0};
+    if (loadSettings(&settings, "settings.json") != 0)
+    {
+        settings = (gameSettings){
+            .splitDeck = 1,
+            .magicNumberSeven = 1,
+            .tenOnSeven = 0,
+            .playerAutoOrder = 1,
+            .hinting = 0,
+            .aiDifficulty = 3,
+            .magicNumberEight = 1,
+            .threeOnEight = 1,
+            .allowVoluntaryPickup = 1};
+        printf("Settings file not found, using default settings\n");
+    }
+
     initGame(&g, settings);
     initHandCards(&g, settings);
     sortHands(&g, settings, 1);
@@ -195,6 +213,7 @@ void main()
     }
     determineWhoStarts(&g);
 
-    // DEBUG print
+#ifdef DEBUG
     printGame(&g, settings);
+#endif
 }

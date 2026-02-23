@@ -15,5 +15,24 @@ brew install libsodium
 
 ## Building
 ```shell
+# Build (default: debug)
 make
+
+# Build explicitly in release mode (same as default)
+make BUILD=release
+
+# Build debug (no optimizations, includes debug symbols)
+make BUILD=debug
+
+# Or use convenience targets
+make release
+make debug
+
+# Clean
+make clean
 ```
+
+## TODO
+- format settings of my liking
+- save settings as JSON
+- start with easy logic

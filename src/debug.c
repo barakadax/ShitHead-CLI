@@ -3,7 +3,9 @@
 
 void printCard(card c)
 {
-    char *type = c.type == 0 ? "♥" : c.type == 1 ? "♦" : c.type == 2   ? "♠" : "♣";
+    char *type = c.type == 0 ? "♥" : c.type == 1 ? "♦"
+                                 : c.type == 2   ? "♠"
+                                                 : "♣";
     if (c.value != 0)
     {
         printf("[%u:%s]", c.value, type);
@@ -26,11 +28,18 @@ void printGame(const game *g, gameSettings settings)
 {
     printf("\n--- Game Debug State ---\n");
     printf("Settings:\n");
-    printf("  player auto card sort: %s\n", settings.playerAutoOrder ? "ON" : "OFF");
     printf("  split deck: %s\n", settings.splitDeck ? "ON" : "OFF");
+    printf("  magic number seven: %s\n", settings.magicNumberSeven ? "YES" : "NO");
     printf("  allow to put ten on seven: %s\n", settings.tenOnSeven ? "YES" : "NO");
+    printf("  player auto card sort: %s\n", settings.playerAutoOrder ? "ON" : "OFF");
     printf("  hinting: %s\n", settings.hinting ? "ON" : "OFF");
-    printf("  ai difficulty: %s\n", settings.aiDifficulty == 0 ? "EASY" : settings.aiDifficulty == 1 ? "MEDIUM" : settings.aiDifficulty == 2   ? "HARD" : "CHEATER");
+    printf("  AI difficulty: %s\n", settings.aiDifficulty == 0 ? "EASY" : settings.aiDifficulty == 1 ? "MEDIUM"
+                                                                      : settings.aiDifficulty == 2   ? "HARD"
+                                                                                                     : "CHEATER");
+    printf("  magic number eight: %s\n", settings.magicNumberEight ? "YES" : "NO");
+    printf("  three on eight: %s\n", settings.threeOnEight ? "YES" : "NO");
+    printf("  allow voluntary pickup: %s\n", settings.allowVoluntaryPickup ? "YES" : "NO");
+
     printf("\nStats:\n");
     printf("  whoseTurn: %s\n", g->stats.whoseTurn ? "Computer" : "Player");
     printf("  deckCounter: %d\n", g->stats.deckCounter);

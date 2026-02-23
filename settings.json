@@ -1,0 +1,11 @@
+{
+    "splitDeck": 1,
+    "magicNumberSeven": 1,
+    "tenOnSeven": 0,
+    "playerAutoOrder": 1,
+    "hinting": 0,
+    "aiDifficulty": 0,
+    "magicNumberEight": 1,
+    "threeOnEight": 1,
+    "allowVoluntaryPickup": 1
+}
