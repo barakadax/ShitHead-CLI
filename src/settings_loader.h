@@ -3,6 +3,6 @@
 
 #include "game.h"
 
-int loadSettings(gameSettings *settings, const char *filename);
+int loadSettings(gameSettings* settings, const char* filename);
 
 #endif

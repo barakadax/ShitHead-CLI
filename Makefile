@@ -3,7 +3,7 @@ CFLAGS_BASE = -std=gnu23 -static
 CFLAGS_RELEASE = $(CFLAGS_BASE) -O3 -s -DNDEBUG
 CFLAGS_DEBUG = $(CFLAGS_BASE) -g -O0 -DDEBUG
 LIBS = -lsodium -lm -lpthread
-SRC = src/main.c src/settings_loader.c
+SRC = src/main.c src/settings_loader.c src/difficulties/easy.c
 DBG_SRC =
 TARGET = shithead
 

@@ -4,18 +4,9 @@
     {
       "label": "Build Debug",
       "type": "shell",
-      "command": "gcc",
+      "command": "make",
       "args": [
-        "-g",
-        "-O0",
-        "-static",
-        "src/main.c",
-        "src/debug.c",
-        "-o",
-        "a",
-        "-lsodium",
-        "-lm",
-        "-lpthread"
+        "debug"
       ],
       "options": {
         "cwd": "${workspaceFolder}"

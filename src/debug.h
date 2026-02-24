@@ -3,6 +3,6 @@
 
 #include "game.h"
 
-void printGame(const game *g, gameSettings settings);
+void printGame(const game* g, gameSettings settings);
 
 #endif // DEBUG_H

@@ -5,7 +5,7 @@
       "name": "Debug a (gdb)",
       "type": "cppdbg",
       "request": "launch",
-      "program": "${workspaceFolder}/main",
+      "program": "${workspaceFolder}/shithead",
       "args": [],
       "stopAtEntry": false,
       "cwd": "${workspaceFolder}",

@@ -33,6 +33,5 @@ make clean
 ```
 
 ## TODO
-- format settings of my liking
 - save settings as JSON
 - start with easy logic

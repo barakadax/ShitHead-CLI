@@ -1,0 +1,10 @@
+BasedOnStyle: LLVM
+IndentWidth: 4
+ColumnLimit: 128
+BreakBeforeBraces: Attach
+BreakBeforeTernaryOperators: false
+TabWidth: 4
+UseTab: Always
+InsertBraces: true
+PointerAlignment: Left
+SpaceBeforeCpp11BracedList: true
