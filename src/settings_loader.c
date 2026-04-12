@@ -53,6 +53,9 @@ static SettingKey getSettingKey(const char* key) {
 	if (strcmp(key, "music") == 0) {
 		return KEY_MUSIC;
 	}
+	if (strcmp(key, "autoSave") == 0) {
+		return KEY_AUTO_SAVE;
+	}
 	return KEY_UNKNOWN;
 }
 
@@ -115,6 +118,9 @@ int loadSettings(gameSettings* settings, const char* filename) {
 				break;
 			case KEY_MUSIC:
 				settings->music = value;
+				break;
+			case KEY_AUTO_SAVE:
+				settings->autoSave = value;
 				break;
 			default:
 				printf("Unknown setting: %s\n", key);

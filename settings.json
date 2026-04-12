@@ -9,5 +9,6 @@
     "threeOnEight": 1,
     "allowVoluntaryPickup": 1,
     "cardSounds": 1,
-    "music": 1
+    "music": 1,
+    "autoSave": 1
 }

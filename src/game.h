@@ -59,7 +59,8 @@ typedef enum {
 	KEY_THREE_ON_EIGHT,
 	KEY_ALLOW_VOLUNTARY_PICKUP,
 	KEY_CARD_SOUNDS,
-	KEY_MUSIC
+	KEY_MUSIC,
+	KEY_AUTO_SAVE
 } SettingKey;
 
 typedef struct gameSettings {
@@ -74,6 +75,7 @@ typedef struct gameSettings {
 	uint8_t allowVoluntaryPickup : 1;
 	uint8_t cardSounds : 1;
 	uint8_t music : 1;
+	uint8_t autoSave : 1;
 } gameSettings;
 
 #endif // GAME_H

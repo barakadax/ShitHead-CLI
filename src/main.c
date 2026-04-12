@@ -167,7 +167,8 @@ void main() {
 								   .threeOnEight = 1,
 								   .allowVoluntaryPickup = 1,
 								   .cardSounds = 0,
-								   .music = 0};
+								   .music = 0,
+								   .autoSave = 1};
 		printf("Settings file not found, using default settings\n");
 	}
 

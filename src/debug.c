@@ -40,6 +40,7 @@ void printGame(const game* g, gameSettings settings) {
 	printf("  allow voluntary pickup: %s\n", settings.allowVoluntaryPickup ? "YES" : "NO");
 	printf("  card sounds: %s\n", settings.cardSounds ? "ON" : "OFF");
 	printf("  music: %s\n", settings.music ? "ON" : "OFF");
+	printf("  auto save: %s\n", settings.autoSave ? "ON" : "OFF");
 
 	printf("\nStats:\n");
 	printf("  whoseTurn: %s\n", g->stats.whoseTurn ? "Computer" : "Player");
