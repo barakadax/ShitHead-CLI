@@ -34,9 +34,7 @@ uint8_t slotExists(uint8_t slot) {
 	char path[64];
 	statePath(slot, path, sizeof(path));
 	FILE* f = fopen(path, "r");
-	if (!f) {
-		return 0;
-	}
+	if (!f) return 0;
 	fclose(f);
 	return 1;
 }
@@ -45,17 +43,13 @@ uint8_t slotIsFinished(uint8_t slot) {
 	char path[64];
 	statePath(slot, path, sizeof(path));
 	FILE* f = fopen(path, "r");
-	if (!f) {
-		return 0;
-	}
+	if (!f) return 0;
 	char line[256];
 	uint8_t result = 0;
 	while (fgets(line, sizeof(line), f)) {
 		if (strstr(line, "\"gameOver\"")) {
 			char* colon = strchr(line, ':');
-			if (colon && atoi(colon + 1) != 0) {
-				result = 1;
-			}
+			if (colon && atoi(colon + 1) != 0) result = 1;
 			break;
 		}
 	}
@@ -63,25 +57,16 @@ uint8_t slotIsFinished(uint8_t slot) {
 	return result;
 }
 
-
 static void writeCardArray(FILE* f, const char* key, const card* cards, uint8_t count) {
 	fprintf(f, "  \"%s\": \"", key);
 	for (uint8_t i = 0; i < count; i++) {
-		if (i > 0) {
-			fprintf(f, ",");
-		}
+		if (i > 0) fprintf(f, ",");
 		fprintf(f, "%u:%u", (unsigned)cards[i].value, (unsigned)cards[i].type);
 	}
 	fprintf(f, "\"");
 }
 
-static int writeStateJson(const char* path, const game* g, uint8_t gameOver) {
-	FILE* f = fopen(path, "w");
-	if (!f) {
-		return -1;
-	}
-	fprintf(f, "{\n");
-	fprintf(f, "  \"gameOver\": %u,\n", (unsigned)gameOver);
+static void writeStateCounters(FILE* f, const game* g) {
 	fprintf(f, "  \"whoseTurn\": %u,\n", (unsigned)g->stats.whoseTurn);
 	fprintf(f, "  \"deckCounter\": %u,\n", (unsigned)g->stats.deckCounter);
 	fprintf(f, "  \"splitDeckCounter\": %u,\n", (unsigned)g->stats.splitDeckCounter);
@@ -94,6 +79,9 @@ static int writeStateJson(const char* path, const game* g, uint8_t gameOver) {
 	fprintf(f, "  \"playerHandCounter\": %u,\n", (unsigned)g->stats.playerHandCounter);
 	fprintf(f, "  \"playerFaceUpCounter\": %u,\n", (unsigned)g->stats.playerFaceUpCounter);
 	fprintf(f, "  \"playerFaceDownCounter\": %u,\n", (unsigned)g->stats.playerFaceDownCounter);
+}
+
+static void writeStateCardArrays(FILE* f, const game* g) {
 	writeCardArray(f, "deck", g->deck, g->stats.deckCounter);
 	fprintf(f, ",\n");
 	writeCardArray(f, "splitDeck", g->splitDeck, g->stats.splitDeckCounter);
@@ -115,21 +103,29 @@ static int writeStateJson(const char* path, const game* g, uint8_t gameOver) {
 	writeCardArray(f, "aiFaceUp", g->ai.faceUpCards, g->stats.aiFaceUpCounter);
 	fprintf(f, ",\n");
 	writeCardArray(f, "aiFaceDown", g->ai.faceDownCards, g->stats.aiFaceDownCounter);
-	fprintf(f, "\n}\n");
+	fprintf(f, "\n");
+}
+
+static int writeStateJson(const char* path, const game* g, uint8_t gameOver) {
+	FILE* f = fopen(path, "w");
+	if (!f) return -1;
+	fprintf(f, "{\n");
+	fprintf(f, "  \"gameOver\": %u,\n", (unsigned)gameOver);
+	writeStateCounters(f, g);
+	writeStateCardArrays(f, g);
+	fprintf(f, "}\n");
 	fclose(f);
 	return 0;
 }
 
-int saveSlot(uint8_t slot, const game* g, gameSettings settings, uint8_t gameOver) {
+int saveSlot(uint8_t slot, slotSnapshot snap) {
 	ensureSlotDirectory(slot);
 	char settPath[64];
 	char stPath[64];
 	settingsPath(slot, settPath, sizeof(settPath));
 	statePath(slot, stPath, sizeof(stPath));
-	if (saveSettings(&settings, settPath) != 0) {
-		return -1;
-	}
-	return writeStateJson(stPath, g, gameOver);
+	if (saveSettings(&snap.settings, settPath) != 0) return -1;
+	return writeStateJson(stPath, snap.g, snap.gameOver);
 }
 
 typedef enum {
@@ -205,11 +201,44 @@ static uint8_t parseCardArray(const char* str, card* out, uint8_t maxCount) {
 	return count;
 }
 
+static void applyStateCounter(game* g, StateKey sk, int val) {
+	switch (sk) {
+	case STATE_KEY_WHOSE_TURN:           g->stats.whoseTurn = val; break;
+	case STATE_KEY_DECK_COUNTER:         g->stats.deckCounter = val; break;
+	case STATE_KEY_SPLIT_DECK_COUNTER:   g->stats.splitDeckCounter = val; break;
+	case STATE_KEY_PILE_COUNTER:         g->stats.pileCounter = val; break;
+	case STATE_KEY_UNUSABLE_COUNTER:     g->stats.unusableCounter = val; break;
+	case STATE_KEY_AI_KNOWN_COUNTER:     g->stats.aiKnownPlayerCardsCounter = val; break;
+	case STATE_KEY_AI_HAND_COUNTER:      g->stats.aiHandCounter = val; break;
+	case STATE_KEY_AI_FACE_UP_COUNTER:   g->stats.aiFaceUpCounter = val; break;
+	case STATE_KEY_AI_FACE_DOWN_COUNTER: g->stats.aiFaceDownCounter = val; break;
+	case STATE_KEY_PLAYER_HAND_COUNTER:  g->stats.playerHandCounter = val; break;
+	case STATE_KEY_PLAYER_FACE_UP_COUNTER:   g->stats.playerFaceUpCounter = val; break;
+	case STATE_KEY_PLAYER_FACE_DOWN_COUNTER: g->stats.playerFaceDownCounter = val; break;
+	default: break;
+	}
+}
+
+static void applyStateCardArray(game* g, StateKey sk, const char* arrStr) {
+	switch (sk) {
+	case STATE_KEY_DECK:         parseCardArray(arrStr, g->deck, maxCardsAmount); break;
+	case STATE_KEY_SPLIT_DECK:   parseCardArray(arrStr, g->splitDeck, maxCardsAmount); break;
+	case STATE_KEY_PILE:         parseCardArray(arrStr, g->pile, maxCardsAmount); break;
+	case STATE_KEY_UNUSABLE:     parseCardArray(arrStr, g->unusableCards, maxCardsAmount); break;
+	case STATE_KEY_AI_KNOWN:     parseCardArray(arrStr, g->aiKnownPlayerCards, maxCardsAmount); break;
+	case STATE_KEY_PLAYER_HAND:  parseCardArray(arrStr, g->player.hand, maxCardsAmount); break;
+	case STATE_KEY_PLAYER_FACE_UP:   parseCardArray(arrStr, g->player.faceUpCards, defaultTableCardsAmount); break;
+	case STATE_KEY_PLAYER_FACE_DOWN: parseCardArray(arrStr, g->player.faceDownCards, defaultTableCardsAmount); break;
+	case STATE_KEY_AI_HAND:      parseCardArray(arrStr, g->ai.hand, maxCardsAmount); break;
+	case STATE_KEY_AI_FACE_UP:   parseCardArray(arrStr, g->ai.faceUpCards, defaultTableCardsAmount); break;
+	case STATE_KEY_AI_FACE_DOWN: parseCardArray(arrStr, g->ai.faceDownCards, defaultTableCardsAmount); break;
+	default: break;
+	}
+}
+
 static int readStateJson(const char* path, game* g) {
 	FILE* f = fopen(path, "r");
-	if (!f) {
-		return -1;
-	}
+	if (!f) return -1;
 	char line[1024];
 	while (fgets(line, sizeof(line), f)) {
 		char* keyStart = strchr(line, '"');
@@ -237,85 +266,9 @@ static int readStateJson(const char* path, game* g) {
 			char* arrEnd = strchr(arrStart, '"');
 			if (!arrEnd) continue;
 			*arrEnd = '\0';
-			switch (sk) {
-			case STATE_KEY_DECK:
-				parseCardArray(arrStart, g->deck, maxCardsAmount);
-				break;
-			case STATE_KEY_SPLIT_DECK:
-				parseCardArray(arrStart, g->splitDeck, maxCardsAmount);
-				break;
-			case STATE_KEY_PILE:
-				parseCardArray(arrStart, g->pile, maxCardsAmount);
-				break;
-			case STATE_KEY_UNUSABLE:
-				parseCardArray(arrStart, g->unusableCards, maxCardsAmount);
-				break;
-			case STATE_KEY_AI_KNOWN:
-				parseCardArray(arrStart, g->aiKnownPlayerCards, maxCardsAmount);
-				break;
-			case STATE_KEY_PLAYER_HAND:
-				parseCardArray(arrStart, g->player.hand, maxCardsAmount);
-				break;
-			case STATE_KEY_PLAYER_FACE_UP:
-				parseCardArray(arrStart, g->player.faceUpCards, defaultTableCardsAmount);
-				break;
-			case STATE_KEY_PLAYER_FACE_DOWN:
-				parseCardArray(arrStart, g->player.faceDownCards, defaultTableCardsAmount);
-				break;
-			case STATE_KEY_AI_HAND:
-				parseCardArray(arrStart, g->ai.hand, maxCardsAmount);
-				break;
-			case STATE_KEY_AI_FACE_UP:
-				parseCardArray(arrStart, g->ai.faceUpCards, defaultTableCardsAmount);
-				break;
-			case STATE_KEY_AI_FACE_DOWN:
-				parseCardArray(arrStart, g->ai.faceDownCards, defaultTableCardsAmount);
-				break;
-			default:
-				break;
-			}
+			applyStateCardArray(g, sk, arrStart);
 		} else {
-			int val = atoi(valStart);
-			switch (sk) {
-			case STATE_KEY_WHOSE_TURN:
-				g->stats.whoseTurn = val;
-				break;
-			case STATE_KEY_DECK_COUNTER:
-				g->stats.deckCounter = val;
-				break;
-			case STATE_KEY_SPLIT_DECK_COUNTER:
-				g->stats.splitDeckCounter = val;
-				break;
-			case STATE_KEY_PILE_COUNTER:
-				g->stats.pileCounter = val;
-				break;
-			case STATE_KEY_UNUSABLE_COUNTER:
-				g->stats.unusableCounter = val;
-				break;
-			case STATE_KEY_AI_KNOWN_COUNTER:
-				g->stats.aiKnownPlayerCardsCounter = val;
-				break;
-			case STATE_KEY_AI_HAND_COUNTER:
-				g->stats.aiHandCounter = val;
-				break;
-			case STATE_KEY_AI_FACE_UP_COUNTER:
-				g->stats.aiFaceUpCounter = val;
-				break;
-			case STATE_KEY_AI_FACE_DOWN_COUNTER:
-				g->stats.aiFaceDownCounter = val;
-				break;
-			case STATE_KEY_PLAYER_HAND_COUNTER:
-				g->stats.playerHandCounter = val;
-				break;
-			case STATE_KEY_PLAYER_FACE_UP_COUNTER:
-				g->stats.playerFaceUpCounter = val;
-				break;
-			case STATE_KEY_PLAYER_FACE_DOWN_COUNTER:
-				g->stats.playerFaceDownCounter = val;
-				break;
-			default:
-				break;
-			}
+			applyStateCounter(g, sk, atoi(valStart));
 		}
 	}
 	fclose(f);
@@ -327,8 +280,6 @@ int loadSlot(uint8_t slot, game* g, gameSettings* settings) {
 	char stPath[64];
 	settingsPath(slot, settPath, sizeof(settPath));
 	statePath(slot, stPath, sizeof(stPath));
-	if (loadSettings(settings, settPath) != 0) {
-		return -1;
-	}
+	if (loadSettings(settings, settPath) != 0) return -1;
 	return readStateJson(stPath, g);
 }

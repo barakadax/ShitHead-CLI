@@ -5,4 +5,4 @@
 
 void printGame(const game* g, gameSettings settings);
 
-#endif // DEBUG_H
+#endif

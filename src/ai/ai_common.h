@@ -13,14 +13,13 @@ typedef struct cardSelection {
 cardSelection emptySelection(void);
 uint8_t selectionIsEmpty(cardSelection sel);
 
-cardSelection findHighestStandardValidSingle(const card* hand, uint8_t handCount, card top, gameSettings s);
-cardSelection findLowestStandardValidSingle(const card* hand, uint8_t handCount, card top, gameSettings s);
-cardSelection findLowestValidSetMaxQuantity(const card* hand, uint8_t handCount, card top, gameSettings s);
-cardSelection findMagicCard(const card* hand, uint8_t handCount, card top, gameSettings s, const uint8_t* priorityValues, uint8_t priorityCount);
-cardSelection tryCompleteFourOfAKind(const game* g, const card* hand, uint8_t handCount, card top, gameSettings s);
-cardSelection forcePickupFromKnown(const card* hand, uint8_t handCount, const card* knownPlayerCards,
-	uint8_t knownCount, card top, gameSettings s);
+cardSelection findHighestStandardValidSingle(cardSet hand, playContext ctx);
+cardSelection findLowestStandardValidSingle(cardSet hand, playContext ctx);
+cardSelection findLowestValidSetMaxQuantity(cardSet hand, playContext ctx);
+cardSelection findMagicCard(cardSet hand, playContext ctx, valueList priority);
+cardSelection tryCompleteFourOfAKind(const game* g, cardSet hand, playContext ctx);
+cardSelection forcePickupFromKnown(cardSet hand, cardSet known, playContext ctx);
 
-uint8_t removeCardIndicesFromHand(card* hand, uint8_t handCount, const uint8_t* indices, uint8_t indexCount);
+uint8_t removeCardIndices(card* hand, uint8_t handCount, cardIndexList indices);
 
 #endif

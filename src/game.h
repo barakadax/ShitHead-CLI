@@ -69,7 +69,7 @@ typedef struct gameSettings {
 	uint8_t tenOnSeven : 1;
 	uint8_t playerAutoOrder : 1;
 	uint8_t hinting : 1;
-	uint8_t aiDifficulty : 2; // 0: easy, 1: medium, 2: hard, 3: cheater
+	uint8_t aiDifficulty : 2;
 	uint8_t magicNumberEight : 1;
 	uint8_t threeOnEight : 1;
 	uint8_t allowVoluntaryPickup : 1;
@@ -78,4 +78,31 @@ typedef struct gameSettings {
 	uint8_t autoSave : 1;
 } gameSettings;
 
-#endif // GAME_H
+typedef enum {
+	difficultyEasy = 0,
+	difficultyMedium = 1,
+	difficultyHard = 2,
+	difficultyCheater = 3,
+} aiDifficultyKind;
+
+typedef struct playContext {
+	card top;
+	gameSettings settings;
+} playContext;
+
+typedef struct cardSet {
+	const card* cards;
+	uint8_t count;
+} cardSet;
+
+typedef struct cardIndexList {
+	uint8_t count;
+	uint8_t indices[maxCardsAmount];
+} cardIndexList;
+
+typedef struct valueList {
+	const uint8_t* values;
+	uint8_t count;
+} valueList;
+
+#endif

@@ -4,9 +4,10 @@
 #include "game.h"
 
 void printCard(card c);
-void printBoard(const game* g, gameSettings s);
+void printBoard(const game* g);
 void printPlayerHand(const game* g);
 void printPlayerFaceUp(const game* g);
+void printRules(void);
 void promptEnterToContinue(void);
 
 #endif

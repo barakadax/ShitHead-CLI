@@ -12,13 +12,13 @@ uint8_t selectionIsEmpty(cardSelection sel) {
 	return sel.count == 0;
 }
 
-cardSelection findHighestStandardValidSingle(const card* hand, uint8_t handCount, card top, gameSettings s) {
+cardSelection findHighestStandardValidSingle(cardSet hand, playContext ctx) {
 	cardSelection best = emptySelection();
 	uint8_t bestRank = 0;
-	for (uint8_t i = 0; i < handCount; i++) {
-		uint8_t v = hand[i].value;
-		if (v == 2 || v == 3 || v == 7 || v == 8 || v == 10 || v == 1) continue;
-		if (!canPlayCardOn(hand[i], top, s)) continue;
+	for (uint8_t i = 0; i < hand.count; i++) {
+		uint8_t v = hand.cards[i].value;
+		if (isNonStarterValue(v)) continue;
+		if (!canPlayCardOn(hand.cards[i], ctx)) continue;
 		uint8_t r = cardRank(v);
 		if (r > bestRank) {
 			bestRank = r;
@@ -30,13 +30,13 @@ cardSelection findHighestStandardValidSingle(const card* hand, uint8_t handCount
 	return best;
 }
 
-cardSelection findLowestStandardValidSingle(const card* hand, uint8_t handCount, card top, gameSettings s) {
+cardSelection findLowestStandardValidSingle(cardSet hand, playContext ctx) {
 	cardSelection best = emptySelection();
 	uint8_t lowestRank = 255;
-	for (uint8_t i = 0; i < handCount; i++) {
-		uint8_t v = hand[i].value;
-		if (v == 2 || v == 3 || v == 7 || v == 8 || v == 10 || v == 1) continue;
-		if (!canPlayCardOn(hand[i], top, s)) continue;
+	for (uint8_t i = 0; i < hand.count; i++) {
+		uint8_t v = hand.cards[i].value;
+		if (isNonStarterValue(v)) continue;
+		if (!canPlayCardOn(hand.cards[i], ctx)) continue;
 		uint8_t r = cardRank(v);
 		if (r < lowestRank) {
 			lowestRank = r;
@@ -48,33 +48,31 @@ cardSelection findLowestStandardValidSingle(const card* hand, uint8_t handCount,
 	return best;
 }
 
-cardSelection findLowestValidSetMaxQuantity(const card* hand, uint8_t handCount, card top, gameSettings s) {
+cardSelection findLowestValidSetMaxQuantity(cardSet hand, playContext ctx) {
 	cardSelection best = emptySelection();
 	uint8_t lowestRank = 255;
-
-	for (uint8_t i = 0; i < handCount; i++) {
-		if (!canPlayCardOn(hand[i], top, s)) continue;
-		uint8_t r = cardRank(hand[i].value);
-		if (r < lowestRank) {
-			lowestRank = r;
-		}
+	for (uint8_t i = 0; i < hand.count; i++) {
+		if (isNonStarterValue(hand.cards[i].value)) continue;
+		if (!canPlayCardOn(hand.cards[i], ctx)) continue;
+		uint8_t r = cardRank(hand.cards[i].value);
+		if (r < lowestRank) lowestRank = r;
 	}
 	if (lowestRank == 255) return best;
-
-	for (uint8_t i = 0; i < handCount; i++) {
-		if (cardRank(hand[i].value) == lowestRank && canPlayCardOn(hand[i], top, s)) {
+	for (uint8_t i = 0; i < hand.count; i++) {
+		if (isNonStarterValue(hand.cards[i].value)) continue;
+		if (cardRank(hand.cards[i].value) == lowestRank && canPlayCardOn(hand.cards[i], ctx)) {
 			best.indices[best.count++] = i;
-			best.cardValue = hand[i].value;
+			best.cardValue = hand.cards[i].value;
 		}
 	}
 	return best;
 }
 
-cardSelection findMagicCard(const card* hand, uint8_t handCount, card top, gameSettings s, const uint8_t* priorityValues, uint8_t priorityCount) {
-	for (uint8_t p = 0; p < priorityCount; p++) {
-		uint8_t targetValue = priorityValues[p];
-		for (uint8_t i = 0; i < handCount; i++) {
-			if (hand[i].value == targetValue && canPlayCardOn(hand[i], top, s)) {
+cardSelection findMagicCard(cardSet hand, playContext ctx, valueList priority) {
+	for (uint8_t p = 0; p < priority.count; p++) {
+		uint8_t targetValue = priority.values[p];
+		for (uint8_t i = 0; i < hand.count; i++) {
+			if (hand.cards[i].value == targetValue && canPlayCardOn(hand.cards[i], ctx)) {
 				cardSelection sel = emptySelection();
 				sel.cardValue = targetValue;
 				sel.indices[sel.count++] = i;
@@ -85,7 +83,7 @@ cardSelection findMagicCard(const card* hand, uint8_t handCount, card top, gameS
 	return emptySelection();
 }
 
-cardSelection tryCompleteFourOfAKind(const game* g, const card* hand, uint8_t handCount, card top, gameSettings s) {
+cardSelection tryCompleteFourOfAKind(const game* g, cardSet hand, playContext ctx) {
 	if (g->stats.pileCounter == 0) return emptySelection();
 	uint8_t topValue = g->pile[g->stats.pileCounter - 1].value;
 	uint8_t consecutiveOnPile = 0;
@@ -93,11 +91,10 @@ cardSelection tryCompleteFourOfAKind(const game* g, const card* hand, uint8_t ha
 		consecutiveOnPile++;
 	}
 	uint8_t neededToComplete = (uint8_t)(4 - consecutiveOnPile);
-	if (neededToComplete == 0 || neededToComplete > handCount) return emptySelection();
-
+	if (neededToComplete == 0 || neededToComplete > hand.count) return emptySelection();
 	cardSelection sel = emptySelection();
-	for (uint8_t i = 0; i < handCount && sel.count < neededToComplete; i++) {
-		if (hand[i].value == topValue && canPlayCardOn(hand[i], top, s)) {
+	for (uint8_t i = 0; i < hand.count && sel.count < neededToComplete; i++) {
+		if (hand.cards[i].value == topValue && canPlayCardOn(hand.cards[i], ctx)) {
 			sel.indices[sel.count++] = i;
 			sel.cardValue = topValue;
 		}
@@ -106,24 +103,19 @@ cardSelection tryCompleteFourOfAKind(const game* g, const card* hand, uint8_t ha
 	return sel;
 }
 
-cardSelection forcePickupFromKnown(const card* hand, uint8_t handCount, const card* knownPlayerCards,
-	uint8_t knownCount, card top, gameSettings s) {
-	if (knownCount == 0) return emptySelection();
-
+cardSelection forcePickupFromKnown(cardSet hand, cardSet known, playContext ctx) {
+	if (known.count == 0) return emptySelection();
 	uint8_t playerHighestRank = 0;
-	for (uint8_t i = 0; i < knownCount; i++) {
-		uint8_t r = cardRank(knownPlayerCards[i].value);
-		if (r > playerHighestRank) {
-			playerHighestRank = r;
-		}
+	for (uint8_t i = 0; i < known.count; i++) {
+		uint8_t r = cardRank(known.cards[i].value);
+		if (r > playerHighestRank) playerHighestRank = r;
 	}
-
 	cardSelection best = emptySelection();
 	uint8_t bestRank = 0;
-	for (uint8_t i = 0; i < handCount; i++) {
-		uint8_t v = hand[i].value;
+	for (uint8_t i = 0; i < hand.count; i++) {
+		uint8_t v = hand.cards[i].value;
 		if (v == 2 || v == 3 || v == 10) continue;
-		if (!canPlayCardOn(hand[i], top, s)) continue;
+		if (!canPlayCardOn(hand.cards[i], ctx)) continue;
 		uint8_t r = cardRank(v);
 		if (r > playerHighestRank && r > bestRank) {
 			bestRank = r;
@@ -135,10 +127,10 @@ cardSelection forcePickupFromKnown(const card* hand, uint8_t handCount, const ca
 	return best;
 }
 
-uint8_t removeCardIndicesFromHand(card* hand, uint8_t handCount, const uint8_t* indices, uint8_t indexCount) {
+uint8_t removeCardIndices(card* hand, uint8_t handCount, cardIndexList indices) {
 	uint8_t removeFlags[maxCardsAmount] = {0};
-	for (uint8_t i = 0; i < indexCount; i++) {
-		removeFlags[indices[i]] = 1;
+	for (uint8_t i = 0; i < indices.count; i++) {
+		removeFlags[indices.indices[i]] = 1;
 	}
 	uint8_t writeIdx = 0;
 	for (uint8_t readIdx = 0; readIdx < handCount; readIdx++) {

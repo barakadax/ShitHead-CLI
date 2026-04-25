@@ -10,16 +10,17 @@
 #include "medium.h"
 #include <sodium.h>
 #include <stdio.h>
+#include <string.h>
 
-typedef cardSelection (*selectPlayFn)(const game*, gameSettings, const card*, uint8_t, card);
+typedef cardSelection (*selectPlayFn)(const game* g, cardSet hand, playContext ctx);
 
 static selectPlayFn selectPlayForDifficulty(uint8_t difficulty) {
-	switch (difficulty) {
-	case 0: return aiEasySelectPlay;
-	case 1: return aiMediumSelectPlay;
-	case 2: return aiHardSelectPlay;
-	case 3: return aiCheaterSelectPlay;
-	default: return aiEasySelectPlay;
+	switch ((aiDifficultyKind)difficulty) {
+	case difficultyEasy:    return aiEasySelectPlay;
+	case difficultyMedium:  return aiMediumSelectPlay;
+	case difficultyHard:    return aiHardSelectPlay;
+	case difficultyCheater: return aiCheaterSelectPlay;
+	default:                return aiEasySelectPlay;
 	}
 }
 
@@ -33,13 +34,14 @@ static void printPlayedCards(const card* cards, uint8_t count) {
 }
 
 static uint8_t aiTakeTurnFromHand(game* g, gameSettings s) {
-	card top = topEffectiveCard(g);
+	playContext ctx = {topEffectiveCard(g), s};
 	selectPlayFn selectPlay = selectPlayForDifficulty(s.aiDifficulty);
-	cardSelection sel = selectPlay(g, s, g->ai.hand, g->stats.aiHandCounter, top);
+	cardSet hand = {g->ai.hand, g->stats.aiHandCounter};
+	cardSelection sel = selectPlay(g, hand, ctx);
 
 	if (selectionIsEmpty(sel)) {
 		printf("AI picks up the pile.\n");
-		pickupPileIntoHand(g, 1);
+		pickupPileToAi(g);
 		sortSingleHand(g->ai.hand, g->stats.aiHandCounter);
 		return 0;
 	}
@@ -48,7 +50,9 @@ static uint8_t aiTakeTurnFromHand(game* g, gameSettings s) {
 	for (uint8_t i = 0; i < sel.count; i++) {
 		played[i] = g->ai.hand[sel.indices[i]];
 	}
-	g->stats.aiHandCounter = removeCardIndicesFromHand(g->ai.hand, g->stats.aiHandCounter, sel.indices, sel.count);
+	cardIndexList playedIdx = {.count = sel.count};
+	memcpy(playedIdx.indices, sel.indices, sel.count);
+	g->stats.aiHandCounter = removeCardIndices(g->ai.hand, g->stats.aiHandCounter, playedIdx);
 	printPlayedCards(played, sel.count);
 	drawUpToThreeForAi(g, s);
 	pushCardsToPile(g, played, sel.count);
@@ -56,13 +60,14 @@ static uint8_t aiTakeTurnFromHand(game* g, gameSettings s) {
 }
 
 static uint8_t aiTakeTurnFromFaceUp(game* g, gameSettings s) {
-	card top = topEffectiveCard(g);
+	playContext ctx = {topEffectiveCard(g), s};
 	selectPlayFn selectPlay = selectPlayForDifficulty(s.aiDifficulty);
-	cardSelection sel = selectPlay(g, s, g->ai.faceUpCards, g->stats.aiFaceUpCounter, top);
+	cardSet hand = {g->ai.faceUpCards, g->stats.aiFaceUpCounter};
+	cardSelection sel = selectPlay(g, hand, ctx);
 
 	if (selectionIsEmpty(sel)) {
 		printf("AI picks up the pile.\n");
-		pickupPileIntoHand(g, 1);
+		pickupPileToAi(g);
 		sortSingleHand(g->ai.hand, g->stats.aiHandCounter);
 		return 0;
 	}
@@ -71,7 +76,9 @@ static uint8_t aiTakeTurnFromFaceUp(game* g, gameSettings s) {
 	for (uint8_t i = 0; i < sel.count; i++) {
 		played[i] = g->ai.faceUpCards[sel.indices[i]];
 	}
-	g->stats.aiFaceUpCounter = removeCardIndicesFromHand(g->ai.faceUpCards, g->stats.aiFaceUpCounter, sel.indices, sel.count);
+	cardIndexList playedIdx = {.count = sel.count};
+	memcpy(playedIdx.indices, sel.indices, sel.count);
+	g->stats.aiFaceUpCounter = removeCardIndices(g->ai.faceUpCards, g->stats.aiFaceUpCounter, playedIdx);
 	printf("AI plays face-up:");
 	for (uint8_t i = 0; i < sel.count; i++) {
 		printf(" ");
@@ -83,22 +90,22 @@ static uint8_t aiTakeTurnFromFaceUp(game* g, gameSettings s) {
 }
 
 static uint8_t aiTakeTurnFromFaceDown(game* g, gameSettings s) {
-	card top = topEffectiveCard(g);
+	playContext ctx = {topEffectiveCard(g), s};
 	uint32_t randomIdx = randombytes_uniform(g->stats.aiFaceDownCounter);
 	card chosen = g->ai.faceDownCards[randomIdx];
 
-	g->stats.aiFaceDownCounter = removeCardIndicesFromHand(g->ai.faceDownCards, g->stats.aiFaceDownCounter,
-		(uint8_t[]){(uint8_t)randomIdx}, 1);
+	g->stats.aiFaceDownCounter = removeCardIndices(g->ai.faceDownCards, g->stats.aiFaceDownCounter,
+		(cardIndexList){.count = 1, .indices = {(uint8_t)randomIdx}});
 
 	printf("AI plays face-down: ");
 	printCard(chosen);
 	printf("\n");
 
-	if (!canPlayCardOn(chosen, top, s)) {
+	if (!canPlayCardOn(chosen, ctx)) {
 		printf("AI's face-down card is invalid! AI picks up.\n");
 		g->ai.hand[g->stats.aiHandCounter++] = chosen;
 		sortSingleHand(g->ai.hand, g->stats.aiHandCounter);
-		pickupPileIntoHand(g, 1);
+		pickupPileToAi(g);
 		return 0;
 	}
 
@@ -107,11 +114,7 @@ static uint8_t aiTakeTurnFromFaceDown(game* g, gameSettings s) {
 }
 
 uint8_t aiTakeTurn(game* g, gameSettings s) {
-	if (g->stats.aiHandCounter > 0) {
-		return aiTakeTurnFromHand(g, s);
-	}
-	if (g->stats.aiFaceUpCounter > 0) {
-		return aiTakeTurnFromFaceUp(g, s);
-	}
+	if (g->stats.aiHandCounter > 0) return aiTakeTurnFromHand(g, s);
+	if (g->stats.aiFaceUpCounter > 0) return aiTakeTurnFromFaceUp(g, s);
 	return aiTakeTurnFromFaceDown(g, s);
 }

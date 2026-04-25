@@ -10,14 +10,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef DEBUG
+#include "debug/debug.h"
+#endif
 
 static uint8_t isGameOver(const game* g) {
-	if (g->stats.playerHandCounter == 0 && g->stats.playerFaceUpCounter == 0 && g->stats.playerFaceDownCounter == 0) {
-		return 1;
-	}
-	if (g->stats.aiHandCounter == 0 && g->stats.aiFaceUpCounter == 0 && g->stats.aiFaceDownCounter == 0) {
-		return 2;
-	}
+	if (g->stats.playerHandCounter == 0 && g->stats.playerFaceUpCounter == 0 && g->stats.playerFaceDownCounter == 0) return 1;
+	if (g->stats.aiHandCounter == 0 && g->stats.aiFaceUpCounter == 0 && g->stats.aiFaceDownCounter == 0) return 2;
 	return 0;
 }
 
@@ -35,9 +34,7 @@ uint8_t applyMagicEffects(game* g, uint8_t playedValue, gameSettings s) {
 			actor, g->stats.whoseTurn == 0 ? "" : "s");
 		return 1;
 	}
-	if (playedValue == 8 && s.magicNumberEight) {
-		return 1;
-	}
+	if (playedValue == 8 && s.magicNumberEight) return 1;
 	return 0;
 }
 
@@ -48,9 +45,7 @@ uint8_t applyThreeOnEightBonus(game* g, gameSettings s) {
 	while (underneathIdx >= 0 && g->pile[underneathIdx].value == 3) {
 		underneathIdx--;
 	}
-	if (underneathIdx >= 0 && g->pile[underneathIdx].value == 8) {
-		return 1;
-	}
+	if (underneathIdx >= 0 && g->pile[underneathIdx].value == 8) return 1;
 	return 0;
 }
 
@@ -90,27 +85,42 @@ static uint8_t promptCardCount(const card* cards, uint8_t cardCount, uint8_t car
 }
 
 static uint8_t playerTurnFromHand(game* g, gameSettings s) {
-	card top = topEffectiveCard(g);
-	printBoard(g, s);
+	playContext ctx = {topEffectiveCard(g), s};
+	printBoard(g);
 
 	if (s.hinting) {
-		printHints(g->player.hand, g->stats.playerHandCounter, top, s);
+		printHints((cardSet){g->player.hand, g->stats.playerHandCounter}, ctx);
 	}
 
-	if (s.allowVoluntaryPickup) {
-		printf("Options: enter card number, or 'p' to pick up pile: ");
+	uint8_t canPickup = s.allowVoluntaryPickup && g->stats.pileCounter > 0;
+	if (canPickup) {
+		printf("Options: enter card number, 'p' to pick up pile, 'r' for rules");
 	} else {
-		printf("Enter card number to play: ");
+		printf("Options: enter card number, 'r' for rules");
 	}
+#ifdef DEBUG
+	printf(", 'd' for debug");
+#endif
+	printf(": ");
 	fflush(stdout);
 
 	char buf[16];
 	if (!fgets(buf, sizeof(buf), stdin)) return 0;
 
-	if (s.allowVoluntaryPickup && buf[0] == 'p') {
+	if (buf[0] == 'r') {
+		printRules();
+		return playerTurnFromHand(g, s);
+	}
+#ifdef DEBUG
+	if (buf[0] == 'd') {
+		printGame(g, s);
+		return playerTurnFromHand(g, s);
+	}
+#endif
+	if (canPickup && buf[0] == 'p') {
 		printf("You pick up the pile.\n");
 		addPileToKnownPlayerCards(g);
-		pickupPileIntoHand(g, 0);
+		pickupPileToPlayer(g);
 		if (s.playerAutoOrder) sortSingleHand(g->player.hand, g->stats.playerHandCounter);
 		return 0;
 	}
@@ -122,54 +132,81 @@ static uint8_t playerTurnFromHand(game* g, gameSettings s) {
 	}
 
 	card chosen = g->player.hand[idx];
-	if (!canPlayCardOn(chosen, top, s)) {
+	if (!canPlayCardOn(chosen, ctx)) {
 		printf("That card cannot be played here.\n");
 		return playerTurnFromHand(g, s);
 	}
 
 	uint8_t count = promptCardCount(g->player.hand, g->stats.playerHandCounter, chosen.value);
 	card toPlay[maxCardsAmount];
-	uint8_t playIndices[maxCardsAmount];
-	uint8_t found = 0;
-	for (uint8_t i = 0; i < g->stats.playerHandCounter && found < count; i++) {
+	cardIndexList toRemove = {0};
+	for (uint8_t i = 0; i < g->stats.playerHandCounter && toRemove.count < count; i++) {
 		if (g->player.hand[i].value == chosen.value) {
-			toPlay[found] = g->player.hand[i];
-			playIndices[found] = i;
-			found++;
+			toPlay[toRemove.count] = g->player.hand[i];
+			toRemove.indices[toRemove.count++] = i;
 		}
 	}
 
-	for (uint8_t i = 0; i < found; i++) {
+	for (uint8_t i = 0; i < toRemove.count; i++) {
 		removeFromKnownIfPresent(g, toPlay[i]);
 	}
 
-	g->stats.playerHandCounter = removeCardIndicesFromHand(g->player.hand, g->stats.playerHandCounter, playIndices, found);
+	uint8_t totalToPlay = toRemove.count;
+	if (toRemove.count == g->stats.playerHandCounter) {
+		cardIndexList faceUpToRemove = {0};
+		for (uint8_t i = 0; i < g->stats.playerFaceUpCounter; i++) {
+			if (g->player.faceUpCards[i].value == chosen.value) {
+				toPlay[totalToPlay++] = g->player.faceUpCards[i];
+				faceUpToRemove.indices[faceUpToRemove.count++] = i;
+			}
+		}
+		if (faceUpToRemove.count > 0) {
+			g->stats.playerFaceUpCounter = removeCardIndices(g->player.faceUpCards, g->stats.playerFaceUpCounter, faceUpToRemove);
+		}
+	}
+
+	g->stats.playerHandCounter = removeCardIndices(g->player.hand, g->stats.playerHandCounter, toRemove);
 	drawUpToThreeForPlayer(g, s);
-	pushCardsToPile(g, toPlay, found);
+	pushCardsToPile(g, toPlay, totalToPlay);
 
 	return resolveAnotherTurn(g, chosen.value, s);
 }
 
 static uint8_t playerTurnFromFaceUp(game* g, gameSettings s) {
-	card top = topEffectiveCard(g);
-	printBoard(g, s);
+	playContext ctx = {topEffectiveCard(g), s};
+	printBoard(g);
 
 	if (s.hinting) {
-		printHints(g->player.faceUpCards, g->stats.playerFaceUpCounter, top, s);
+		printHints((cardSet){g->player.faceUpCards, g->stats.playerFaceUpCounter}, ctx);
 	}
 
+	uint8_t canPickup = s.allowVoluntaryPickup && g->stats.pileCounter > 0;
 	printf("Enter face-up card number to play");
-	if (s.allowVoluntaryPickup) printf(", or 'p' to pick up pile");
+	if (canPickup) printf(", 'p' to pick up pile");
+	printf(", 'r' for rules");
+#ifdef DEBUG
+	printf(", 'd' for debug");
+#endif
 	printf(": ");
 	fflush(stdout);
 
 	char buf[16];
 	if (!fgets(buf, sizeof(buf), stdin)) return 0;
 
-	if (s.allowVoluntaryPickup && buf[0] == 'p') {
+	if (buf[0] == 'r') {
+		printRules();
+		return playerTurnFromFaceUp(g, s);
+	}
+#ifdef DEBUG
+	if (buf[0] == 'd') {
+		printGame(g, s);
+		return playerTurnFromFaceUp(g, s);
+	}
+#endif
+	if (canPickup && buf[0] == 'p') {
 		printf("You pick up the pile.\n");
 		addPileToKnownPlayerCards(g);
-		pickupPileIntoHand(g, 0);
+		pickupPileToPlayer(g);
 		if (s.playerAutoOrder) sortSingleHand(g->player.hand, g->stats.playerHandCounter);
 		return 0;
 	}
@@ -181,41 +218,54 @@ static uint8_t playerTurnFromFaceUp(game* g, gameSettings s) {
 	}
 
 	card chosen = g->player.faceUpCards[idx];
-	if (!canPlayCardOn(chosen, top, s)) {
+	if (!canPlayCardOn(chosen, ctx)) {
 		printf("That card cannot be played here.\n");
 		return playerTurnFromFaceUp(g, s);
 	}
 
 	uint8_t count = promptCardCount(g->player.faceUpCards, g->stats.playerFaceUpCounter, chosen.value);
 	card toPlay[defaultTableCardsAmount];
-	uint8_t playIndices[defaultTableCardsAmount];
-	uint8_t found = 0;
-	for (uint8_t i = 0; i < g->stats.playerFaceUpCounter && found < count; i++) {
+	cardIndexList toRemove = {0};
+	for (uint8_t i = 0; i < g->stats.playerFaceUpCounter && toRemove.count < count; i++) {
 		if (g->player.faceUpCards[i].value == chosen.value) {
-			toPlay[found] = g->player.faceUpCards[i];
-			playIndices[found] = i;
-			found++;
+			toPlay[toRemove.count] = g->player.faceUpCards[i];
+			toRemove.indices[toRemove.count++] = i;
 		}
 	}
 
-	g->stats.playerFaceUpCounter = removeCardIndicesFromHand(g->player.faceUpCards, g->stats.playerFaceUpCounter, playIndices, found);
-	pushCardsToPile(g, toPlay, found);
+	g->stats.playerFaceUpCounter = removeCardIndices(g->player.faceUpCards, g->stats.playerFaceUpCounter, toRemove);
+	pushCardsToPile(g, toPlay, toRemove.count);
 
 	return resolveAnotherTurn(g, chosen.value, s);
 }
 
 static uint8_t playerTurnFromFaceDown(game* g, gameSettings s) {
-	card top = topEffectiveCard(g);
-	printBoard(g, s);
+	playContext ctx = {topEffectiveCard(g), s};
+	printBoard(g);
 
-	printf("You have %u face-down card%s. Enter number (1-%u) to play blind: ",
+	printf("You have %u face-down card%s. Enter number (1-%u) to play blind, 'r' for rules",
 		(unsigned)g->stats.playerFaceDownCounter,
 		g->stats.playerFaceDownCounter == 1 ? "" : "s",
 		(unsigned)g->stats.playerFaceDownCounter);
+#ifdef DEBUG
+	printf(", 'd' for debug");
+#endif
+	printf(": ");
 	fflush(stdout);
 
 	char buf[16];
 	if (!fgets(buf, sizeof(buf), stdin)) return 0;
+
+	if (buf[0] == 'r') {
+		printRules();
+		return playerTurnFromFaceDown(g, s);
+	}
+#ifdef DEBUG
+	if (buf[0] == 'd') {
+		printGame(g, s);
+		return playerTurnFromFaceDown(g, s);
+	}
+#endif
 
 	int idx = atoi(buf) - 1;
 	if (idx < 0 || (uint8_t)idx >= g->stats.playerFaceDownCounter) {
@@ -228,14 +278,15 @@ static uint8_t playerTurnFromFaceDown(game* g, gameSettings s) {
 	printCard(chosen);
 	printf("\n");
 
-	g->stats.playerFaceDownCounter = removeCardIndicesFromHand(g->player.faceDownCards, g->stats.playerFaceDownCounter, (uint8_t[]){idx}, 1);
+	g->stats.playerFaceDownCounter = removeCardIndices(g->player.faceDownCards, g->stats.playerFaceDownCounter,
+		(cardIndexList){.count = 1, .indices = {(uint8_t)idx}});
 
-	if (!canPlayCardOn(chosen, top, s)) {
+	if (!canPlayCardOn(chosen, ctx)) {
 		printf("Invalid — card goes to your hand and you pick up the pile.\n");
 		g->player.hand[g->stats.playerHandCounter++] = chosen;
 		if (s.playerAutoOrder) sortSingleHand(g->player.hand, g->stats.playerHandCounter);
 		addPileToKnownPlayerCards(g);
-		pickupPileIntoHand(g, 0);
+		pickupPileToPlayer(g);
 		if (s.playerAutoOrder) sortSingleHand(g->player.hand, g->stats.playerHandCounter);
 		return 0;
 	}
@@ -246,12 +297,8 @@ static uint8_t playerTurnFromFaceDown(game* g, gameSettings s) {
 }
 
 static uint8_t playerTakeTurn(game* g, gameSettings s) {
-	if (g->stats.playerHandCounter > 0) {
-		return playerTurnFromHand(g, s);
-	}
-	if (g->stats.playerFaceUpCounter > 0) {
-		return playerTurnFromFaceUp(g, s);
-	}
+	if (g->stats.playerHandCounter > 0) return playerTurnFromHand(g, s);
+	if (g->stats.playerFaceUpCounter > 0) return playerTurnFromFaceUp(g, s);
 	return playerTurnFromFaceDown(g, s);
 }
 
@@ -264,24 +311,20 @@ uint8_t runGameLoop(game* g, gameSettings s, uint8_t slot) {
 			} else {
 				printf("\n*** You lose! You are the ShitHead! ***\n");
 			}
-			saveSlot(slot, g, s, 1);
+			saveSlot(slot, (slotSnapshot){g, s, 1});
 			return over;
 		}
 
 		if (g->stats.whoseTurn == 0) {
 			if (s.autoSave) {
-				saveSlot(slot, g, s, 0);
+				saveSlot(slot, (slotSnapshot){g, s, 0});
 			}
 			uint8_t anotherTurn = playerTakeTurn(g, s);
-			if (!anotherTurn) {
-				g->stats.whoseTurn = 1;
-			}
+			if (!anotherTurn) g->stats.whoseTurn = 1;
 		} else {
 			printf("\n--- AI's turn ---\n");
 			uint8_t anotherTurn = aiTakeTurn(g, s);
-			if (!anotherTurn) {
-				g->stats.whoseTurn = 0;
-			}
+			if (!anotherTurn) g->stats.whoseTurn = 0;
 		}
 	}
 }

@@ -11,12 +11,12 @@
 #include <string.h>
 
 static const char* difficultyName(uint8_t d) {
-	switch (d) {
-	case 0: return "Easy";
-	case 1: return "Medium";
-	case 2: return "Hard";
-	case 3: return "Cheater";
-	default: return "?";
+	switch ((aiDifficultyKind)d) {
+	case difficultyEasy:    return "Easy";
+	case difficultyMedium:  return "Medium";
+	case difficultyHard:    return "Hard";
+	case difficultyCheater: return "Cheater";
+	default:                return "?";
 	}
 }
 
@@ -40,25 +40,42 @@ static void printSettingsMenu(const gameSettings* s) {
 	fflush(stdout);
 }
 
+static void promptAiDifficulty(gameSettings* s) {
+	printf("New aiDifficulty (0=Easy 1=Medium 2=Hard 3=Cheater): ");
+	fflush(stdout);
+	char buf[8];
+	if (!fgets(buf, sizeof(buf), stdin)) return;
+	int v = atoi(buf);
+	if (v >= difficultyEasy && v <= difficultyCheater) {
+		s->aiDifficulty = (uint8_t)v;
+	} else {
+		printf("Invalid value.\n");
+	}
+}
+
+static void toggleSettingField(gameSettings* s, int choice) {
+	switch (choice) {
+	case 1:  s->splitDeck = !s->splitDeck; break;
+	case 2:  s->magicNumberSeven = !s->magicNumberSeven; break;
+	case 3:  s->tenOnSeven = !s->tenOnSeven; break;
+	case 4:  s->playerAutoOrder = !s->playerAutoOrder; break;
+	case 5:  s->hinting = !s->hinting; break;
+	case 6:  promptAiDifficulty(s); break;
+	case 7:  s->magicNumberEight = !s->magicNumberEight; break;
+	case 8:  s->threeOnEight = !s->threeOnEight; break;
+	case 9:  s->allowVoluntaryPickup = !s->allowVoluntaryPickup; break;
+	case 10: s->cardSounds = !s->cardSounds; break;
+	case 11: s->music = !s->music; break;
+	case 12: s->autoSave = !s->autoSave; break;
+	default: printf("Invalid choice.\n"); break;
+	}
+}
+
 static void runSettingsMenu(void) {
 	gameSettings s = {0};
 	if (loadSettings(&s, "settings.json") != 0) {
-		s = (gameSettings){
-			.splitDeck = 0,
-			.magicNumberSeven = 1,
-			.tenOnSeven = 0,
-			.playerAutoOrder = 1,
-			.hinting = 0,
-			.aiDifficulty = 0,
-			.magicNumberEight = 1,
-			.threeOnEight = 1,
-			.allowVoluntaryPickup = 1,
-			.cardSounds = 0,
-			.music = 0,
-			.autoSave = 1,
-		};
+		s = defaultGameSettings();
 	}
-
 	while (1) {
 		printSettingsMenu(&s);
 		char buf[16];
@@ -68,54 +85,9 @@ static void runSettingsMenu(void) {
 			printf("Settings saved.\n");
 			return;
 		}
-		if (buf[0] == 'b') {
-			return;
-		}
-		int choice = atoi(buf);
-		switch (choice) {
-		case 1:  s.splitDeck = !s.splitDeck; break;
-		case 2:  s.magicNumberSeven = !s.magicNumberSeven; break;
-		case 3:  s.tenOnSeven = !s.tenOnSeven; break;
-		case 4:  s.playerAutoOrder = !s.playerAutoOrder; break;
-		case 5:  s.hinting = !s.hinting; break;
-		case 6:
-			printf("New aiDifficulty (0=Easy 1=Medium 2=Hard 3=Cheater): ");
-			fflush(stdout);
-			if (fgets(buf, sizeof(buf), stdin)) {
-				int v = atoi(buf);
-				if (v >= 0 && v <= 3) {
-					s.aiDifficulty = (uint8_t)v;
-				} else {
-					printf("Invalid value.\n");
-				}
-			}
-			break;
-		case 7:  s.magicNumberEight = !s.magicNumberEight; break;
-		case 8:  s.threeOnEight = !s.threeOnEight; break;
-		case 9:  s.allowVoluntaryPickup = !s.allowVoluntaryPickup; break;
-		case 10: s.cardSounds = !s.cardSounds; break;
-		case 11: s.music = !s.music; break;
-		case 12: s.autoSave = !s.autoSave; break;
-		default: printf("Invalid choice.\n"); break;
-		}
+		if (buf[0] == 'b') return;
+		toggleSettingField(&s, atoi(buf));
 	}
-}
-
-static void printRules(void) {
-	printf("\n=== ShitHead Rules ===\n");
-	printf("Play cards >= the top of the pile. Empty pile: play anything.\n");
-	printf("Progression: Hand -> Face-Up -> Face-Down (face-down is blind).\n");
-	printf("Draw from deck after each turn to maintain 3 in hand.\n");
-	printf("\nMagic Cards:\n");
-	printf("  2  - Resets pile (any card follows)\n");
-	printf("  3  - Transparent (next card plays on card beneath the 3)\n");
-	printf("  7  - [If enabled] Next card must be <= 7\n");
-	printf("  8  - [If enabled] Play again\n");
-	printf("  10 - Burns the pile; play again on an empty pile\n");
-	printf("  A  - Only A, 2, 3, or 10 can follow\n");
-	printf("  4-of-a-kind on top: burns the pile; play again\n");
-	printf("\nWin: be first to empty hand + face-up + face-down.\n");
-	printf("=====================\n\n");
 }
 
 static uint8_t promptSlot(void) {
@@ -139,20 +111,7 @@ static void startNewGame(void) {
 	game g;
 	gameSettings settings = {0};
 	if (loadSettings(&settings, "settings.json") != 0) {
-		settings = (gameSettings){
-			.splitDeck = 0,
-			.magicNumberSeven = 1,
-			.tenOnSeven = 0,
-			.playerAutoOrder = 1,
-			.hinting = 0,
-			.aiDifficulty = 0,
-			.magicNumberEight = 1,
-			.threeOnEight = 1,
-			.allowVoluntaryPickup = 1,
-			.cardSounds = 0,
-			.music = 0,
-			.autoSave = 1,
-		};
+		settings = defaultGameSettings();
 		printf("Settings file not found, using defaults.\n");
 	}
 

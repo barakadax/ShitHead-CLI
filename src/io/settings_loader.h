@@ -3,6 +3,7 @@
 
 #include "game.h"
 
+gameSettings defaultGameSettings(void);
 int loadSettings(gameSettings* settings, const char* filename);
 int saveSettings(const gameSettings* settings, const char* filename);
 
