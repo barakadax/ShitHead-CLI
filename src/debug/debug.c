@@ -1,18 +1,8 @@
 #include "debug.h"
+#include "ui/ui.h"
 #include <stdio.h>
 
-void printCard(card c) {
-	if (c.value == 0) {
-		return;
-	}
-
-	const char* suits[] = {"♥", "♦", "♠", "♣"};
-    const char* ranks[] = {"", "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"};
-
-    printf("[%s:%s]", ranks[c.value], suits[c.type % 4]);
-}
-
-void printCardsArray(const char* name, const card* cards, int amount) {
+static void printCardsArray(const char* name, const card* cards, int amount) {
 	printf("%s: ", name);
 	for (int i = 0; i < amount; i++) {
 		printCard(cards[i]);

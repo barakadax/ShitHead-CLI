@@ -59,6 +59,29 @@ static SettingKey getSettingKey(const char* key) {
 	return KEY_UNKNOWN;
 }
 
+int saveSettings(const gameSettings* settings, const char* filename) {
+	FILE* f = fopen(filename, "w");
+	if (!f) {
+		return -1;
+	}
+	fprintf(f, "{\n");
+	fprintf(f, "  \"splitDeck\": %u,\n", (unsigned)settings->splitDeck);
+	fprintf(f, "  \"magicNumberSeven\": %u,\n", (unsigned)settings->magicNumberSeven);
+	fprintf(f, "  \"tenOnSeven\": %u,\n", (unsigned)settings->tenOnSeven);
+	fprintf(f, "  \"playerAutoOrder\": %u,\n", (unsigned)settings->playerAutoOrder);
+	fprintf(f, "  \"hinting\": %u,\n", (unsigned)settings->hinting);
+	fprintf(f, "  \"aiDifficulty\": %u,\n", (unsigned)settings->aiDifficulty);
+	fprintf(f, "  \"magicNumberEight\": %u,\n", (unsigned)settings->magicNumberEight);
+	fprintf(f, "  \"threeOnEight\": %u,\n", (unsigned)settings->threeOnEight);
+	fprintf(f, "  \"allowVoluntaryPickup\": %u,\n", (unsigned)settings->allowVoluntaryPickup);
+	fprintf(f, "  \"cardSounds\": %u,\n", (unsigned)settings->cardSounds);
+	fprintf(f, "  \"music\": %u,\n", (unsigned)settings->music);
+	fprintf(f, "  \"autoSave\": %u\n", (unsigned)settings->autoSave);
+	fprintf(f, "}\n");
+	fclose(f);
+	return 0;
+}
+
 int loadSettings(gameSettings* settings, const char* filename) {
 	FILE* file = fopen(filename, "r");
 	if (!file) {

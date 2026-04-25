@@ -1,14 +1,14 @@
 {
-    "splitDeck": 0,
-    "magicNumberSeven": 1,
-    "tenOnSeven": 0,
-    "playerAutoOrder": 1,
-    "hinting": 0,
-    "aiDifficulty": 0,
-    "magicNumberEight": 1,
-    "threeOnEight": 1,
-    "allowVoluntaryPickup": 1,
-    "cardSounds": 1,
-    "music": 1,
-    "autoSave": 1
+  "splitDeck": 0,
+  "magicNumberSeven": 1,
+  "tenOnSeven": 0,
+  "playerAutoOrder": 1,
+  "hinting": 1,
+  "aiDifficulty": 1,
+  "magicNumberEight": 1,
+  "threeOnEight": 1,
+  "allowVoluntaryPickup": 1,
+  "cardSounds": 1,
+  "music": 1,
+  "autoSave": 1
 }
